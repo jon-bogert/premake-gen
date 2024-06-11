@@ -1,0 +1,21 @@
+# Visual Studio
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+/.vs
+
+# Makefile
+Makefile
+
+# Build Dirs
+*/int
+/bin
+
+# Binaries
+*.exe
+*.lib
+*.dll
+*.pdb
+
+# Required Library Exceptions
