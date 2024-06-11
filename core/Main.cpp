@@ -583,6 +583,9 @@ Makefile
 *.dll
 *.pdb
 
+# Premake Exception
+!premake5.exe
+
 # Required Library Exceptions
 )";
     for (const std::string& lib : fileManifest)
