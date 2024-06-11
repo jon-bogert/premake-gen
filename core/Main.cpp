@@ -11,7 +11,7 @@
 #define TAB std::string("    ")
 
 #define LIB_PATH _APPDATA_ + "/premake-gen/libraries/"
-#define PREMAKE_GEN_VERSION "v1.0"
+#define PREMAKE_GEN_VERSION "v1.0.1"
 
 
 std::string path;
