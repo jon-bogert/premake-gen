@@ -229,6 +229,14 @@ bool IsWhiteSpace(const std::string& str)
     return true;
 }
 
+void CheckAndPush(std::vector<std::string>& vec, const std::string& str)
+{
+    if (std::find(vec.begin(), vec.end(), str) != vec.end())
+        return;
+
+    vec.push_back(str);
+}
+
 bool ReadLibInfo(ProjectSettings& settings, const std::string& lib)
 {
     std::cout << "Reading info for Library: " << lib << "\n";
@@ -247,24 +255,24 @@ bool ReadLibInfo(ProjectSettings& settings, const std::string& lib)
         if (IsWhiteSpace(line))
             continue;
         
-        if (line[0] == '%')
+        if (line[0] == '@')
         {
             activeMarker = line.substr(1);
             continue;
         }
 
         if (activeMarker == "defines")
-            settings.defines.push_back(line);
+            CheckAndPush(settings.defines, line);
         else if (activeMarker == "additionalIncludeDirs")
-            settings.additionalIncludeDirs.push_back(line);
+            CheckAndPush(settings.additionalIncludeDirs, line);
         else if (activeMarker == "additionalLibDirs")
-            settings.additionalLibDirs;
+            CheckAndPush(settings.additionalLibDirs, line);
         else if (activeMarker == "debugLinks")
-            settings.debugLinks.push_back(line);
+            CheckAndPush(settings.debugLinks, line);
         else if (activeMarker == "globalLinks")
-            settings.globalLinks.push_back(line);
+            CheckAndPush(settings.globalLinks, line);
         else if (activeMarker == "releaseLinks")
-            settings.releaseLinks.push_back(line);
+            CheckAndPush(settings.releaseLinks, line);
         else
         {
             std::cout << "[ERR] Unidentified marker '" << activeMarker << "'\n";
