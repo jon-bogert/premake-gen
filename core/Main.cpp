@@ -189,7 +189,6 @@ void PrintHelp()
     std::cout << "------------------|---------------------------------------------------\n";
     std::cout << "USAGE: premake-gen <Solution> <Project> <flags>\n\n";
     std::cout << "-dialect <number> | C++ version override (17 by default)\n";
-    std::cout << "-windowed         | Windowed app instead of Console (uses WinMain)\n";
     std::cout << "-example          | includes the first library example file as Main.cpp\n";
     std::cout << "                  |     with the rest in the 'examples' folder\n";
     std::cout << "<LibName>         | includes that libarary\n";

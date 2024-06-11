@@ -44,17 +44,7 @@ namespace xe
 			size_t numElements;
 			wcstombs_s(&numElements, dest, appdata, MAX_PATH);
 			dest[numElements] = '\0';
-			std::string result = std::string(dest);
-			for (size_t i = 1; i < result.length();)
-			{
-				if (result[i] == '\\' && result[i - 1] == '\\')
-				{
-					result.erase(result.begin() + i);
-					continue;
-				}
-				++i;
-			}
-			return result;
+			return std::string(dest);
 		}
 		else
 		{
