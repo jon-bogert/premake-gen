@@ -27,8 +27,11 @@ project "core"
 	includedirs
 	{
 		"%{prj.name}/include",
-		"%{prj.name}/src"
+		"%{prj.name}/src",
+		"%{prj.name}/include/zlib"
 	}
+
+	libdirs "%{prj.name}/lib"
 	
 	links
 	{
@@ -46,7 +49,17 @@ project "core"
 	filter "configurations:Debug"
 		defines { "_DEBUG", "_CONSOLE" }
 		symbols "On"
+		links
+		{
+			"minizip-d",
+			"zlib-d"
+		}
 		
 	filter "configurations:Release"
-		defines { "NDEBUG", "NCONSOLE" }
+		defines { "NDEBUG", "_CONSOLE" }
 		optimize "On"
+		links
+		{
+			"minizip",
+			"zlib"
+		}

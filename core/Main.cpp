@@ -10,20 +10,26 @@
 
 #define TAB std::string("    ")
 
-#define LIB_PATH _APPDATA_ + "/premake-gen/libraries/"
-#define PREMAKE_GEN_VERSION "v1.0.2"
+#define PREMAKE_GEN_VERSION "v1.1.0"
+
+#ifdef _DEBUG
+#define DBG_ARGS {"--libdir"}
+#endif // _DEBUG
 
 
 std::string path;
+std::string libDirectory;
 std::vector<std::string> args;
 std::vector<std::string> libManifest;
 std::vector<std::string> fileManifest;
 
-bool GenerateDirectory();
+void GenerateLibDir();
 bool CheckPremakeFolder();
 void ParseArgs(int argc, char* argv[]);
 void PrintHelp();
 void PopulateManifest();
+void SetLibDir(const std::string& path);
+bool CheckLibDir();
 void PrintList();
 bool ReadLibInfo(ProjectSettings& settings, const std::string& lib);
 bool GeneratePremakeFile(const ProjectSettings& settings, const std::string& solution);
@@ -33,17 +39,15 @@ bool GenerateGitignore();
 
 int main(int argc, char* argv[])
 {
-    if (GenerateDirectory())
-    {
-        (void)CheckPremakeFolder();
-        return 0;
-    }
     if (!CheckPremakeFolder())
     {
         return 0;
     }
-
+#ifdef _DEBUG
+    args = DBG_ARGS;
+#else //_DEBUG
     ParseArgs(argc, argv);
+#endif // else _DEBUG
     if (args.empty() || args[0] == "-help" || args[0] == "--help")
     {
         PrintHelp();
@@ -59,14 +63,37 @@ int main(int argc, char* argv[])
         std::cout << "Premake Generator by Jon Bogert (@xepherin): " << PREMAKE_GEN_VERSION << std::endl;
         return 0;
     }
-    if (args[0] == "-dir" || args[0] == "--dir")
+    if (args[0] == "-appdata" || args[0] == "--appdata")
     {
         std::cout << "Opening AppData Directory...\n";
         system(("explorer \"" + _APPDATA_ + "\\premake-gen\"").c_str());
         return 0;
     }
 
+    if (args[0] == "-libdir" || args[0] == "--libdir")
+    {
+        if (args.size() >= 2)
+        {
+            SetLibDir(args[1]);
+            return 0;
+        }
+        if (CheckLibDir())
+        {
+            std::cout << "Opening Library Directory...\n";
+            system(("explorer \"" + libDirectory + "\"").c_str());
+            return 0;
+        }
+        return 1;
+    }
+
+    if (!CheckLibDir())
+    {
+        return 1;
+    }
+
     PopulateManifest();
+
+    GenerateLibDir();
 
     if (args[0] == "-list" || args[0] == "--list")
     {
@@ -145,21 +172,20 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-bool GenerateDirectory()
+void GenerateLibDir()
 {
-    if (!std::filesystem::exists(LIB_PATH))
-    {
-        std::cout << "Generating AppData Directory...\n";
-        std::filesystem::create_directories(LIB_PATH);
-        return true;
-    }
-    return false;
+	if (std::filesystem::exists(libDirectory))
+		return;
+
+	std::cout << "Generating Library Directory...\n";
+	std::filesystem::create_directories(libDirectory);
 }
 
 bool CheckPremakeFolder()
 {
     if (!std::filesystem::exists(_APPDATA_ + "/premake-gen/premake"))
     {
+        std::filesystem::create_directories(_APPDATA_ + "/premake-gen/premake");
         std::cout << "Copy files from provided \"premake\" folder to \"%APPDATA%\\premake-gen\\premake\"\n";
         system(("explorer \"" + _APPDATA_ + "\\premake-gen\"").c_str());
         return false;
@@ -180,28 +206,71 @@ void ParseArgs(int argc, char* argv[])
 void PrintHelp()
 {
     std::cout << "\nPremake Generator -- Help\n";
-    std::cout << "----------------------------------------------------------------------\n";
-    std::cout << "--help            | You're already here ;)\n";
-    std::cout << "--version         | See version number\n";
-    std::cout << "--list            | Lists all available library names\n";
-    std::cout << "--setup           | Instructions on how to setup a new library\n";
-    std::cout << "--dir             | Open the AppData directory in File Explorer\n";
-    std::cout << "------------------|---------------------------------------------------\n";
+    std::cout << "--------------------------------------------------------------------------\n";
+    std::cout << "--help               | You're already here ;)\n";
+    std::cout << "--version            | See version number\n";
+    std::cout << "--list               | Lists all available library names\n";
+    std::cout << "--setup              | Instructions on how to setup a new library\n";
+    std::cout << "--libdir             | Open the set library directory\n";
+    std::cout << "--libdir <directory> | Set the library directory\n";
+    std::cout << "--appdata            | Open the AppData directory in File Explorer\n";
+    std::cout << "---------------------|----------------------------------------------------\n";
     std::cout << "USAGE: premake-gen <Solution> <Project> <flags>\n\n";
-    std::cout << "-dialect <number> | C++ version override (17 by default)\n";
-    std::cout << "-example          | includes the first library example file as Main.cpp\n";
-    std::cout << "                  |     with the rest in the 'examples' folder\n";
-    std::cout << "<LibName>         | includes that libarary\n";
-    std::cout << "----------------------------------------------------------------------\n";
+    std::cout << "-dialect <number>    | C++ version override (17 by default)\n";
+    std::cout << "-example             | includes the first library example file as Main.cpp\n";
+    std::cout << "                     |     with the rest in the 'examples' folder\n";
+    std::cout << "<LibName>            | includes that libarary\n";
+    std::cout << "--------------------------------------------------------------------------\n";
 }
 
 void PopulateManifest()
 {
     std::cout << "Finding available libraries...\n";
-    for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(LIB_PATH))
+    for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(libDirectory))
     {
         libManifest.push_back(entry.path().filename().u8string());
     }
+}
+
+void SetLibDir(const std::string& path)
+{
+    if (!std::filesystem::exists(_APPDATA_ + "/premake-gen"))
+        std::filesystem::create_directories(_APPDATA_ + "/premake-gen");
+    if (!std::filesystem::exists(path))
+        std::filesystem::create_directories(path);
+
+    std::ofstream file(_APPDATA_ + "/premake-gen/settings.info");
+    file << "@libDirectory\n" << path << std::endl;
+}
+
+bool CheckLibDir()
+{
+    if (!std::filesystem::exists(_APPDATA_ + "/premake-gen/settings.info"))
+    {
+        std::cout << "No library directory specified. Use '--libdir <directory>' to specify one." << std::endl;
+        return false;
+    }
+
+    std::ifstream file(_APPDATA_ + "/premake-gen/settings.info");
+
+    std::string tag;
+    std::string line;
+    while (std::getline(file, line))
+    {
+        if (line.empty())
+            continue;
+        if (line[0] == '@')
+        {
+            tag = line.substr(1);
+            continue;
+        }
+
+        if (tag == "libDirectory")
+        {
+            libDirectory = line;
+        }
+    }
+    return !libDirectory.empty();
 }
 
 void PrintList()
@@ -243,10 +312,10 @@ bool ReadLibInfo(ProjectSettings& settings, const std::string& lib)
     std::string activeMarker = "";
     std::string line = "";
 
-    std::ifstream info(LIB_PATH + lib + "/library.info");
+    std::ifstream info(libDirectory + "/" + lib + "/library.info");
     if (!info.is_open())
     {
-        std::cout << "Could not find or read: " << LIB_PATH + lib + "/library.info" << std::endl;
+        std::cout << "Could not find or read: " << libDirectory + "/" + lib + "/library.info" << std::endl;
         return false;
     }
 
@@ -483,22 +552,22 @@ bool CopyFiles(const std::string& project, const std::vector<std::string>& libra
     {
         std::cout << "Copying required files for library: " << lib << "\n";
 
-        if (std::filesystem::exists(LIB_PATH + lib + "/include"))
+        if (std::filesystem::exists(libDirectory + "/" + lib + "/include"))
         {
-            if (!DoCopy(LIB_PATH + lib + "/include", project + "/include"))
+            if (!DoCopy(libDirectory + "/" + lib + "/include", project + "/include"))
                 return false;
         }
-        if (std::filesystem::exists(LIB_PATH + lib + "/lib"))
+        if (std::filesystem::exists(libDirectory + "/" + lib + "/lib"))
         {
-            if (!DoCopy(LIB_PATH + lib + "/lib", project + "/lib"))
+            if (!DoCopy(libDirectory + "/" + lib + "/lib", project + "/lib"))
                 return false;
         }
-        if (std::filesystem::exists(LIB_PATH + lib + "/bin"))
+        if (std::filesystem::exists(libDirectory + "/" + lib + "/bin"))
         {
-            if (!DoCopy(LIB_PATH + lib + "/bin", project))
+            if (!DoCopy(libDirectory + "/" + lib + "/bin", project))
                 return false;
         }
-        if (useExamples && std::filesystem::exists(LIB_PATH + lib + "/main.cpp"))
+        if (useExamples && std::filesystem::exists(libDirectory + "/" + lib + "/main.cpp"))
         {
             if (firstExample)
             {
@@ -507,11 +576,11 @@ bool CopyFiles(const std::string& project, const std::vector<std::string>& libra
                 firstExample = false;
                 try
                 {
-                    std::filesystem::copy_file(LIB_PATH + lib + "/main.cpp", project + "/Main.cpp");
+                    std::filesystem::copy_file(libDirectory + "/" + lib + "/main.cpp", project + "/Main.cpp");
                 }
                 catch (std::exception e)
                 {
-                    std::cout << "[ERR] Could not copy file from: " << LIB_PATH + lib + "/main.cpp" << " to " << project + "/Main.cpp" << "" << std::endl;
+                    std::cout << "[ERR] Could not copy file from: " << libDirectory + "/" + lib + "/main.cpp" << " to " << project + "/Main.cpp" << "" << std::endl;
                     return false;
                 }
             }
@@ -521,11 +590,11 @@ bool CopyFiles(const std::string& project, const std::vector<std::string>& libra
                 try
                 {
                     std::filesystem::create_directories(project + "/../examples");
-                    std::filesystem::copy_file(LIB_PATH + lib + "/main.cpp", project + "/../examples/" + lib + ".cpp");
+                    std::filesystem::copy_file(libDirectory + "/" + lib + "/main.cpp", project + "/../examples/" + lib + ".cpp");
                 }
                 catch (std::exception e)
                 {
-                    std::cout << "[ERR] Could not copy file from: " << LIB_PATH + lib + "/main.cpp" << " to " << project + "/" + lib + ".cpp" << std::endl;
+                    std::cout << "[ERR] Could not copy file from: " << libDirectory + "/" + lib + "/main.cpp" << " to " << project + "/" + lib + ".cpp" << std::endl;
                     return false;
                 }
             }

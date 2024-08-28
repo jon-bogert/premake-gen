@@ -7,7 +7,11 @@ Premake Generator -- How to Setup a Library
 ----------------------------------------------------------------------
 1. Build your libraries - This tool only works with built
    Static (.lib) and Dynamic (.dll) Libraries
-2. Create a folder within %APPDATA%\premake-gen\libraries
+2. If using for the first time, Set a location for your libraies using 
+   the  "--libdir <directory>" flag.
+   Example > premake-gen --libdir "C:\premake-gen\libraries"
+3. Create a new folder in your library directoy named after
+   the library you are adding.
 3. Place required include headers into a "include" folder in your
    library folder.
 4. Place required static library files (.lib) into a "lib" folder in
