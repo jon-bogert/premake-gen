@@ -16,18 +16,18 @@ Premake Generator -- How to Setup a Library
    your library folder.
 6. Create a text file named "library.info" (make sure the extension is
    ".info" not ".txt")
-7. Place required project settings all with new lines under %-tagged
+7. Place required project settings all with new lines under @-tagged
    headings
-    a. %defines - list any required preprocessor defines
-    b. %globalLinks - list any required libraries that need to be
+    a. @defines - list any required preprocessor defines
+    b. @globalLinks - list any required libraries that need to be
        linked globaly (without .lib extension)
-    c. %debugLinks - list any required libraries that need to be
+    c. @debugLinks - list any required libraries that need to be
        linked in debug mode (without .lib extension)
-    d. %releaseLinks - list any required libraries that need to be
+    d. @releaseLinks - list any required libraries that need to be
        linked in release mode (without .lib extension)
-    e. %additionalIncludeDirs - list include directories/
+    e. @additionalIncludeDirs - list include directories/
        sub-directories that are not %{prj.name}/include
-    e. %additionalLibDirs - list library file directories/
+    e. @additionalLibDirs - list library file directories/
        sub-directories that are not %{prj.name}/lib
 8. Place an example main file into the library folder named "main.cpp"
 ----------------------------------------------------------------------

@@ -11,7 +11,7 @@
 #define TAB std::string("    ")
 
 #define LIB_PATH _APPDATA_ + "/premake-gen/libraries/"
-#define PREMAKE_GEN_VERSION "v1.0.1"
+#define PREMAKE_GEN_VERSION "v1.0.2"
 
 
 std::string path;
@@ -322,7 +322,6 @@ bool GeneratePremakeFile(const ProjectSettings& settings, const std::string& sol
     file << TAB << "location \"%{prj.name}\"\n";
     file << TAB << "kind \"" << KindString(settings.kind) << "\"\n";
     file << TAB << "language \"C++\"\n";
-    file << TAB << "language \"C++\"\n";
     file << TAB << "targetname \"" << settings.targetName << "\"\n";
     file << TAB << "targetdir (\"bin/\".. outputdir)\n";
     file << TAB << "objdir (\"%{prj.name}/int/\" .. outputdir)\n";
@@ -360,7 +359,7 @@ bool GeneratePremakeFile(const ProjectSettings& settings, const std::string& sol
     }
 
     // Library Directories
-    if (settings.additionalIncludeDirs.empty())
+    if (settings.additionalLibDirs.empty())
     {
         //Cleaner version
         file << TAB << "libdirs \"%{prj.name}/lib\"\n\n";
@@ -369,7 +368,7 @@ bool GeneratePremakeFile(const ProjectSettings& settings, const std::string& sol
     {
         // Multiline Version
         file << TAB << "libdirs\n" << TAB << "{\n";
-        for (const std::string& str : settings.additionalIncludeDirs)
+        for (const std::string& str : settings.additionalLibDirs)
         {
             file << TAB + TAB << "\"" << str << "\",\n";
         }
@@ -521,8 +520,8 @@ bool CopyFiles(const std::string& project, const std::vector<std::string>& libra
                 std::cout << "More than one example file found. Sending " + lib + " example to 'examples/' folder.\n";
                 try
                 {
-                    std::filesystem::create_directories(project + "/examples");
-                    std::filesystem::copy_file(LIB_PATH + lib + "/main.cpp", project + "/" + lib + ".cpp");
+                    std::filesystem::create_directories(project + "/../examples");
+                    std::filesystem::copy_file(LIB_PATH + lib + "/main.cpp", project + "/../examples/" + lib + ".cpp");
                 }
                 catch (std::exception e)
                 {
