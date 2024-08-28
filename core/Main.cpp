@@ -482,7 +482,7 @@ bool GeneratePremakeFile(const ProjectSettings& settings, const std::string& sol
     file << '\n';
 
     file << TAB << R"(filter "configurations:Release"
-		defines { "NDEBUG", "NCONSOLE" }
+		defines { "NDEBUG", "_CONSOLE" }
 		optimize "On"
 )";
     if (!settings.releaseLinks.empty())
