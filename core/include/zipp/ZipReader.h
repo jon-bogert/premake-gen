@@ -68,6 +68,11 @@ namespace zipp
 		bool ExtractToMemory(const Path& entryPath, std::vector<uint8_t>& buffer);
 		bool ExtractToMemory(const std::string& entryPath, std::vector<uint8_t>& buffer);
 
+		//Similar to Extract to Memory, but remove '\r' characters for CRLF text files
+		bool ExtractToString(const Entry& entry, std::string& buffer);
+		bool ExtractToString(const Path& entryPath, std::string& buffer);
+		bool ExtractToString(const std::string& entryPath, std::string& buffer);
+
 	private:
 		std::unordered_map<std::string, size_t> m_pathToIndex;
 		std::vector<std::unique_ptr<Entry>> m_content;

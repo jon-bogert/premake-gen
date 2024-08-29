@@ -1,8 +1,11 @@
+#include <zipp/ZipReader.h>
+
 #include <iostream>
 #include <fstream>
 #include <filesystem>
 #include <unordered_set>
 #include <string>
+#include <sstream>
 #include <conio.h>
 
 #include "AppData.h"
@@ -14,7 +17,8 @@
 #define PREMAKE_GEN_VERSION "v1.1.0"
 
 #ifdef _DEBUG
-#define DBG_ARGS {"test", "prj", "zipp", "yaml-cpp", "-example"}
+//#define DBG_ARGS {"test", "prj", "SFML", "zipp", "yaml-cpp", "-example"}
+#define DBG_ARGS {"--list"}
 #endif // _DEBUG
 
 struct LibDirectoryInfo
@@ -328,9 +332,10 @@ void PrintList()
     std::cout << "----------------------------------------------------------------------\n";
     for (const LibDirectoryInfo& lib : libManifest)
     {
-        std::cout << "- " << lib.name << std::endl;
+        std::cout << "- " << ((lib.isCompressed) ? lib.name + " [*]" : lib.name) << std::endl;
     }
     std::cout << "----------------------------------------------------------------------\n";
+    std::cout << "[*] = Compressed in ZIP file\n\n";
 }
 
 bool IsWhiteSpace(const std::string& str)
@@ -366,8 +371,59 @@ bool ReadLibInfo(ProjectSettings& settings, const LibDirectoryInfo& lib)
 
 bool ReadLibInfo_Zip(ProjectSettings& settings, const std::string& lib)
 {
-    std::cout << "[ERR] Zip file unimplemented";
-    return false;
+    std::string activeMarker = "";
+    std::string line = "";
+
+    zipp::ZipReader zipFile(libDirectory + "/" + lib + ".zip");
+    if (!zipFile.IsOpen())
+    {
+        std::cout << "Could not find or read: " << libDirectory + "/" + lib + ".zip" << std::endl;
+        return false;
+    }
+
+    if (!zipFile.Contains("library.info"))
+    {
+        std::cout << "Could not find or read: " << libDirectory + "/" + lib + ".zip/library.info" << std::endl;
+        return false;
+    }
+    zipp::Entry libraryFile = zipFile["library.info"];
+    std::string infoData;
+    infoData.resize(libraryFile.UncompressedSize() + 1, 0);
+    zipFile.ExtractToString("library.info", infoData);
+
+    std::stringstream info(infoData);
+
+    while (std::getline(info, line))
+    {
+        if (IsWhiteSpace(line))
+            continue;
+
+        if (line[0] == '@')
+        {
+            activeMarker = line.substr(1);
+            continue;
+        }
+
+        if (activeMarker == "defines")
+            CheckAndPush(settings.defines, line);
+        else if (activeMarker == "additionalIncludeDirs")
+            CheckAndPush(settings.additionalIncludeDirs, line);
+        else if (activeMarker == "additionalLibDirs")
+            CheckAndPush(settings.additionalLibDirs, line);
+        else if (activeMarker == "debugLinks")
+            CheckAndPush(settings.debugLinks, line);
+        else if (activeMarker == "globalLinks")
+            CheckAndPush(settings.globalLinks, line);
+        else if (activeMarker == "releaseLinks")
+            CheckAndPush(settings.releaseLinks, line);
+        else
+        {
+            std::cout << "[ERR] Unidentified marker '" << activeMarker << "'\n";
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool ReadLibInfo_Folder(ProjectSettings& settings, const std::string& lib)
@@ -572,7 +628,38 @@ void CheckLibFile(const std::filesystem::path& file)
     fileManifest.push_back(file.u8string());
 }
 
-bool DoCopy(const std::filesystem::path& source, const std::filesystem::path& destination)
+bool DoCopy_Zip(zipp::ZipReader& zipFile, const zipp::Path& source, const std::filesystem::path& destination)
+{
+    try
+    {
+        std::filesystem::create_directories(destination);
+
+        auto lambda = [&](const zipp::Entry& dirEntry, void* userData)
+            {
+                const zipp::Path& path = dirEntry.GetPath();
+                std::filesystem::path dst = std::filesystem::path(destination.string() + "/" + dirEntry.GetPath().SubDirectory(1).AsString());
+
+                if (!dirEntry.IsFile())
+                {
+                    std::filesystem::create_directories(dst);
+                }
+                else
+                {
+                    CheckLibFile(path.Name().AsString());
+                    zipFile.ExtractToFile(dirEntry, dst.u8string());
+                }
+            };
+        zipFile.RecursiveCallback(source, lambda, nullptr, false);
+    }
+    catch (std::exception&)
+    {
+        std::cout << "[ERR] Could not copy files from: " << source << " to " << destination << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool DoCopy_Folder(const std::filesystem::path& source, const std::filesystem::path& destination)
 {
     try
     {
@@ -606,7 +693,7 @@ bool DoCopy(const std::filesystem::path& source, const std::filesystem::path& de
 bool CopyFiles(const std::string& project, const std::vector<LibDirectoryInfo>& libraries, bool useExamples)
 {
     std::cout << "Copying additional premake files...\n";
-    if (!DoCopy(_APPDATA_ + "\\premake-gen\\premake", std::filesystem::current_path()))
+    if (!DoCopy_Folder(_APPDATA_ + "\\premake-gen\\premake", std::filesystem::current_path()))
         return false;
 
     bool firstExample = true;
@@ -653,6 +740,62 @@ int main (int argc, char* argv[])
 
 bool CopyFiles_Zip(const std::string& project, const std::string& lib, bool useExamples, bool& firstExample)
 {
+    std::cout << "Copying required files for library: " << lib << "\n";
+
+    zipp::ZipReader zipFile(libDirectory + "/" + lib + ".zip");
+    if (!zipFile.IsOpen())
+    {
+        std::cout << "Could not find or read: " << libDirectory + "/" + lib + ".zip" << std::endl;
+        return false;
+    }
+
+    if (zipFile.Contains("include"))
+    {
+        if (!DoCopy_Zip(zipFile, zipp::Path("include"), project + "/include"))
+            return false;
+    }
+    if (zipFile.Contains("lib"))
+    {
+        if (!DoCopy_Zip(zipFile, zipp::Path("lib"), project + "/lib"))
+            return false;
+    }
+    if (zipFile.Contains("bin"))
+    {
+        if (!DoCopy_Zip(zipFile, zipp::Path("bin"), project))
+            return false;
+    }
+    if (zipFile.Contains("main.cpp"))
+    {
+        if (firstExample)
+        {
+            std::cout << "Generating Main file based on library: " << lib << "\n";
+
+            firstExample = false;
+            try
+            {
+                zipFile.ExtractToFile("main.cpp", project + "/Main.cpp");
+            }
+            catch (std::exception)
+            {
+                std::cout << "[ERR] Could not copy file from: " << libDirectory + "/" + lib + ".zip/main.cpp" << " to " << project + "/Main.cpp" << "" << std::endl;
+                return false;
+            }
+        }
+        else
+        {
+            std::cout << "More than one example file found. Sending " + lib + " example to 'examples/' folder.\n";
+            try
+            {
+                std::filesystem::create_directories(project + "/../examples");
+                zipFile.ExtractToFile("main.cpp", project + "/../examples/" + lib + ".cpp");
+            }
+            catch (std::exception)
+            {
+                std::cout << "[ERR] Could not copy file from: " << libDirectory + "/" + lib + "/main.cpp" << " to " << project + "/" + lib + ".cpp" << std::endl;
+                return false;
+            }
+        }
+    }
     return true;
 }
 
@@ -662,17 +805,17 @@ bool CopyFiles_Folder(const std::string& project, const std::string& lib, bool u
 
     if (std::filesystem::exists(libDirectory + "/" + lib + "/include"))
     {
-        if (!DoCopy(libDirectory + "/" + lib + "/include", project + "/include"))
+        if (!DoCopy_Folder(libDirectory + "/" + lib + "/include", project + "/include"))
             return false;
     }
     if (std::filesystem::exists(libDirectory + "/" + lib + "/lib"))
     {
-        if (!DoCopy(libDirectory + "/" + lib + "/lib", project + "/lib"))
+        if (!DoCopy_Folder(libDirectory + "/" + lib + "/lib", project + "/lib"))
             return false;
     }
     if (std::filesystem::exists(libDirectory + "/" + lib + "/bin"))
     {
-        if (!DoCopy(libDirectory + "/" + lib + "/bin", project))
+        if (!DoCopy_Folder(libDirectory + "/" + lib + "/bin", project))
             return false;
     }
     if (useExamples && std::filesystem::exists(libDirectory + "/" + lib + "/main.cpp"))
