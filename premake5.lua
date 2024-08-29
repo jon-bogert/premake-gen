@@ -12,7 +12,7 @@ project "core"
 	location "%{prj.name}"
 	kind "ConsoleApp"
 	language "C++"
-	targetname "%{prj.name}"
+	targetname "premake-gen"
 	targetdir ("bin/".. outputdir)
 	objdir ("%{prj.name}/int/".. outputdir)
 	cppdialect "C++17"
@@ -27,8 +27,7 @@ project "core"
 	includedirs
 	{
 		"%{prj.name}/include",
-		"%{prj.name}/src",
-		"%{prj.name}/include/zlib"
+		"%{prj.name}/src"
 	}
 
 	libdirs "%{prj.name}/lib"
@@ -51,8 +50,7 @@ project "core"
 		symbols "On"
 		links
 		{
-			"minizip-d",
-			"zlib-d"
+			"zipp-d"
 		}
 		
 	filter "configurations:Release"
@@ -60,6 +58,5 @@ project "core"
 		optimize "On"
 		links
 		{
-			"minizip",
-			"zlib"
+			"zipp"
 		}

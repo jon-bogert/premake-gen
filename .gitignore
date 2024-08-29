@@ -22,3 +22,6 @@ Makefile
 !premake5.exe
 
 # Required Library Exceptions
+!zipp.lib
+!zipp-d.lib
+!zipp-d.pdb

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <unordered_set>
 #include <string>
 #include <conio.h>
 
@@ -226,9 +227,36 @@ void PrintHelp()
 void PopulateManifest()
 {
     std::cout << "Finding available libraries...\n";
+    std::unordered_set<std::string> added;
     for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(libDirectory))
     {
-        libManifest.push_back(entry.path().filename().u8string());
+        if (!entry.is_regular_file())
+        {
+            std::string name = entry.path().filename().u8string();
+            if (added.find(name) == added.end())
+            {
+                std::cout << "[WARNING] Duplicate library \"" + name + "\" found. premake-gen will use the folder version.\n";
+                continue;
+            }
+            added.insert(name);
+            libManifest.push_back(name);
+            continue;
+        }
+
+        if (!entry.path().has_extension() || entry.path().extension() != ".zip")
+        {
+            std::cout << "[WARNING] Incompatible file in library directory: \"" + entry.path().filename().u8string() + "\". Ignoring...\n";
+            continue;
+        }
+
+        std::string name = entry.path().stem().u8string();
+        if (added.find(name) == added.end())
+        {
+            std::cout << "[WARNING] Duplicate library \"" + name + "\" found. premake-gen will use the folder version.\n";
+            continue;
+        }
+        added.insert(name);
+        libManifest.push_back(name);
     }
 }
 
