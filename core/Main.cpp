@@ -14,27 +14,40 @@
 #define PREMAKE_GEN_VERSION "v1.1.0"
 
 #ifdef _DEBUG
-#define DBG_ARGS {"--libdir"}
+#define DBG_ARGS {"test", "prj", "zipp", "yaml-cpp", "-example"}
 #endif // _DEBUG
 
+struct LibDirectoryInfo
+{
+    std::string name;
+    bool isCompressed = false;
+};
 
 std::string path;
 std::string libDirectory;
 std::vector<std::string> args;
-std::vector<std::string> libManifest;
+std::vector<LibDirectoryInfo> libManifest;
 std::vector<std::string> fileManifest;
 
 void GenerateLibDir();
 bool CheckPremakeFolder();
 void ParseArgs(int argc, char* argv[]);
 void PrintHelp();
+
 void PopulateManifest();
 void SetLibDir(const std::string& path);
 bool CheckLibDir();
 void PrintList();
-bool ReadLibInfo(ProjectSettings& settings, const std::string& lib);
+
+bool ReadLibInfo(ProjectSettings& settings, const LibDirectoryInfo& lib);
+bool ReadLibInfo_Zip(ProjectSettings& settings, const std::string& lib);
+bool ReadLibInfo_Folder(ProjectSettings& settings, const std::string& lib);
+
 bool GeneratePremakeFile(const ProjectSettings& settings, const std::string& solution);
-bool CopyFiles(const std::string& project, const std::vector<std::string>& libraries, bool useExamples);
+
+bool CopyFiles(const std::string& project, const std::vector<LibDirectoryInfo>& libraries, bool useExamples);
+bool CopyFiles_Zip(const std::string& project, const std::string& lib, bool useExamples, bool& firstExample);
+bool CopyFiles_Folder(const std::string& project, const std::string& lib, bool useExamples, bool& firstExample);
 bool GenerateGitignore();
 
 
@@ -110,7 +123,7 @@ int main(int argc, char* argv[])
 
     ProjectSettings settings;
     
-    std::vector<std::string> libraries;
+    std::vector<LibDirectoryInfo> libraries;
     std::string sln = args[0];
     settings.name = args[1];
 
@@ -134,19 +147,24 @@ int main(int argc, char* argv[])
                 return 1;
             }
             ++i;
+            continue;
         }
         else if (args[i] == "-windowed")
         {
             settings.kind = ProjectKind::WindowedApp;
+            continue;
         }
         else if (args[i] == "-example" || args[i] == "-examples")
         {
             includeExamples = true;
+            continue;
         }
-        else if (std::find(libManifest.begin(), libManifest.end(), args[i]) != libManifest.end())
+        auto iter = std::find_if(libManifest.begin(), libManifest.end(),
+            [&](const LibDirectoryInfo& info) { return info.name == args[i]; });
+        if (iter != libManifest.end())
         {
-            libraries.push_back(args[i]);
-            if (!ReadLibInfo(settings, args[i]))
+            LibDirectoryInfo& lib = libraries.emplace_back(*iter);
+            if (!ReadLibInfo(settings, lib))
                 return 1;
         }
         else
@@ -233,13 +251,16 @@ void PopulateManifest()
         if (!entry.is_regular_file())
         {
             std::string name = entry.path().filename().u8string();
-            if (added.find(name) == added.end())
+            if (added.find(name) != added.end())
             {
+                auto iter = std::find_if(libManifest.begin(), libManifest.end(), [&](const LibDirectoryInfo& i) {return i.name == name; });
+                iter->isCompressed = false;
+
                 std::cout << "[WARNING] Duplicate library \"" + name + "\" found. premake-gen will use the folder version.\n";
                 continue;
             }
             added.insert(name);
-            libManifest.push_back(name);
+            libManifest.push_back({ name, false });
             continue;
         }
 
@@ -250,13 +271,13 @@ void PopulateManifest()
         }
 
         std::string name = entry.path().stem().u8string();
-        if (added.find(name) == added.end())
+        if (added.find(name) != added.end())
         {
             std::cout << "[WARNING] Duplicate library \"" + name + "\" found. premake-gen will use the folder version.\n";
             continue;
         }
         added.insert(name);
-        libManifest.push_back(name);
+        libManifest.push_back({ name, true });
     }
 }
 
@@ -305,9 +326,9 @@ void PrintList()
 {
     std::cout << "\nPremake Generator -- Listing Available Libraries:\n";
     std::cout << "----------------------------------------------------------------------\n";
-    for (const std::string& lib : libManifest)
+    for (const LibDirectoryInfo& lib : libManifest)
     {
-        std::cout << "- " << lib << std::endl;
+        std::cout << "- " << lib.name << std::endl;
     }
     std::cout << "----------------------------------------------------------------------\n";
 }
@@ -334,9 +355,23 @@ void CheckAndPush(std::vector<std::string>& vec, const std::string& str)
     vec.push_back(str);
 }
 
-bool ReadLibInfo(ProjectSettings& settings, const std::string& lib)
+bool ReadLibInfo(ProjectSettings& settings, const LibDirectoryInfo& lib)
 {
-    std::cout << "Reading info for Library: " << lib << "\n";
+    std::cout << "Reading info for Library: " << lib.name << "\n";
+    
+    return (lib.isCompressed) ?
+        ReadLibInfo_Zip(settings, lib.name) :
+        ReadLibInfo_Folder(settings, lib.name);
+}
+
+bool ReadLibInfo_Zip(ProjectSettings& settings, const std::string& lib)
+{
+    std::cout << "[ERR] Zip file unimplemented";
+    return false;
+}
+
+bool ReadLibInfo_Folder(ProjectSettings& settings, const std::string& lib)
+{
     std::string activeMarker = "";
     std::string line = "";
 
@@ -351,7 +386,7 @@ bool ReadLibInfo(ProjectSettings& settings, const std::string& lib)
     {
         if (IsWhiteSpace(line))
             continue;
-        
+
         if (line[0] == '@')
         {
             activeMarker = line.substr(1);
@@ -560,7 +595,7 @@ bool DoCopy(const std::filesystem::path& source, const std::filesystem::path& de
             }
         }
     }
-    catch (std::exception& e)
+    catch (std::exception&)
     {
         std::cout << "[ERR] Could not copy files from: " << source << " to " << destination << std::endl;
         return false;
@@ -568,64 +603,24 @@ bool DoCopy(const std::filesystem::path& source, const std::filesystem::path& de
     return true;
 }
 
-
-bool CopyFiles(const std::string& project, const std::vector<std::string>& libraries, bool useExamples)
+bool CopyFiles(const std::string& project, const std::vector<LibDirectoryInfo>& libraries, bool useExamples)
 {
     std::cout << "Copying additional premake files...\n";
     if (!DoCopy(_APPDATA_ + "\\premake-gen\\premake", std::filesystem::current_path()))
         return false;
 
     bool firstExample = true;
-    for (const std::string& lib : libraries)
+    for (const LibDirectoryInfo& lib : libraries)
     {
-        std::cout << "Copying required files for library: " << lib << "\n";
-
-        if (std::filesystem::exists(libDirectory + "/" + lib + "/include"))
+        if (lib.isCompressed)
         {
-            if (!DoCopy(libDirectory + "/" + lib + "/include", project + "/include"))
+            if (!CopyFiles_Zip(project, lib.name, useExamples, firstExample))
                 return false;
         }
-        if (std::filesystem::exists(libDirectory + "/" + lib + "/lib"))
+        else
         {
-            if (!DoCopy(libDirectory + "/" + lib + "/lib", project + "/lib"))
+            if (!CopyFiles_Folder(project, lib.name, useExamples, firstExample))
                 return false;
-        }
-        if (std::filesystem::exists(libDirectory + "/" + lib + "/bin"))
-        {
-            if (!DoCopy(libDirectory + "/" + lib + "/bin", project))
-                return false;
-        }
-        if (useExamples && std::filesystem::exists(libDirectory + "/" + lib + "/main.cpp"))
-        {
-            if (firstExample)
-            {
-                std::cout << "Generating Main file based on library: " << lib << "\n";
-
-                firstExample = false;
-                try
-                {
-                    std::filesystem::copy_file(libDirectory + "/" + lib + "/main.cpp", project + "/Main.cpp");
-                }
-                catch (std::exception e)
-                {
-                    std::cout << "[ERR] Could not copy file from: " << libDirectory + "/" + lib + "/main.cpp" << " to " << project + "/Main.cpp" << "" << std::endl;
-                    return false;
-                }
-            }
-            else
-            {
-                std::cout << "More than one example file found. Sending " + lib + " example to 'examples/' folder.\n";
-                try
-                {
-                    std::filesystem::create_directories(project + "/../examples");
-                    std::filesystem::copy_file(libDirectory + "/" + lib + "/main.cpp", project + "/../examples/" + lib + ".cpp");
-                }
-                catch (std::exception e)
-                {
-                    std::cout << "[ERR] Could not copy file from: " << libDirectory + "/" + lib + "/main.cpp" << " to " << project + "/" + lib + ".cpp" << std::endl;
-                    return false;
-                }
-            }
         }
     }
 
@@ -653,6 +648,65 @@ int main (int argc, char* argv[])
 )";
     }
 
+    return true;
+}
+
+bool CopyFiles_Zip(const std::string& project, const std::string& lib, bool useExamples, bool& firstExample)
+{
+    return true;
+}
+
+bool CopyFiles_Folder(const std::string& project, const std::string& lib, bool useExamples, bool& firstExample)
+{
+    std::cout << "Copying required files for library: " << lib << "\n";
+
+    if (std::filesystem::exists(libDirectory + "/" + lib + "/include"))
+    {
+        if (!DoCopy(libDirectory + "/" + lib + "/include", project + "/include"))
+            return false;
+    }
+    if (std::filesystem::exists(libDirectory + "/" + lib + "/lib"))
+    {
+        if (!DoCopy(libDirectory + "/" + lib + "/lib", project + "/lib"))
+            return false;
+    }
+    if (std::filesystem::exists(libDirectory + "/" + lib + "/bin"))
+    {
+        if (!DoCopy(libDirectory + "/" + lib + "/bin", project))
+            return false;
+    }
+    if (useExamples && std::filesystem::exists(libDirectory + "/" + lib + "/main.cpp"))
+    {
+        if (firstExample)
+        {
+            std::cout << "Generating Main file based on library: " << lib << "\n";
+
+            firstExample = false;
+            try
+            {
+                std::filesystem::copy_file(libDirectory + "/" + lib + "/main.cpp", project + "/Main.cpp");
+            }
+            catch (std::exception e)
+            {
+                std::cout << "[ERR] Could not copy file from: " << libDirectory + "/" + lib + "/main.cpp" << " to " << project + "/Main.cpp" << "" << std::endl;
+                return false;
+            }
+        }
+        else
+        {
+            std::cout << "More than one example file found. Sending " + lib + " example to 'examples/' folder.\n";
+            try
+            {
+                std::filesystem::create_directories(project + "/../examples");
+                std::filesystem::copy_file(libDirectory + "/" + lib + "/main.cpp", project + "/../examples/" + lib + ".cpp");
+            }
+            catch (std::exception e)
+            {
+                std::cout << "[ERR] Could not copy file from: " << libDirectory + "/" + lib + "/main.cpp" << " to " << project + "/" + lib + ".cpp" << std::endl;
+                return false;
+            }
+        }
+    }
     return true;
 }
 
