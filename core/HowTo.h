@@ -10,18 +10,19 @@ Premake Generator -- How to Setup a Library
 2. If using for the first time, Set a location for your libraies using 
    the  "--libdir <directory>" flag.
    Example > premake-gen --libdir "C:\premake-gen\libraries"
-3. Create a new folder in your library directoy named after
-   the library you are adding.
+3. Create a new folder or ZIP file in your library directoy named
+   after the library you are adding.
 3. Place required include headers into a "include" folder in your
-   library folder.
+   library folder/ZIP file.
 4. Place required static library files (.lib) into a "lib" folder in
-   your library folder.
+   your library folder/ZIP file.
 5. Place required dynamic library files (.dll) into a "bin" folder in
-   your library folder.
-6. Create a text file named "library.info" (make sure the extension is
-   ".info" not ".txt")
-7. Place required project settings all with new lines under @-tagged
-   headings
+   your library folder/ZIP file.
+6. Create a text file named "library.info" in the root for your
+   library Folder/ZIP File (make sure the extension is ".info" not
+   ".txt").
+7. in "library.info", place required project settings all with new
+   lines under @-tagged headings:
     a. @defines - list any required preprocessor defines
     b. @globalLinks - list any required libraries that need to be
        linked globaly (without .lib extension)
@@ -33,7 +34,8 @@ Premake Generator -- How to Setup a Library
        sub-directories that are not %{prj.name}/include
     e. @additionalLibDirs - list library file directories/
        sub-directories that are not %{prj.name}/lib
-8. Place an example main file into the library folder named "main.cpp"
+8. Place an example main file into the library folder/ZIP file named
+   "main.cpp"
 ----------------------------------------------------------------------
 )";
 }
