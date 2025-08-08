@@ -20,7 +20,7 @@ The following action flags are available:
 - `--libdir <directory>`: Set the library directory
 - `--appdata`: Open the AppData directory in File Explorer
 
-The main usage structure is `premake-gen` followed by the solution name and then project name. After this you can include the name of any libraries you've added to you library directory as well as any other flags.
+The main usage structure is `premake-gen` followed by the solution name and then project name. After this you can include the names of any libraries you've added to you library directory as well as any other flags.
 
 - `-dialect <number>`: changes the C++ version (C++ 17 is default).
 - `-example`: includes the first library's example file as `Main.cpp` with the rest in the 'examples' folder if available.
