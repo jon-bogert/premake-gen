@@ -27,9 +27,9 @@ The main usage structure is `premake-gen` followed by the solution name and then
 
 `premake-gen <SolutionName> <ProjectName> <Lib(s)> <flag(s)>`
 
-Example:
+Example (C++ 20 solution named "MyApp" with a project named "Core" that includes the ImGui and yaml-cpp libraries. ImGui's example file will be set to Main.cpp and yaml-cpp's example will be included in an "example" folder):
 
-`premake-gen MyApp CoreBuilder ImGui -example -dialect 20`
+`premake-gen MyApp Core ImGui yaml-cpp -example -dialect 20`
 
 ## Libraries
 
