@@ -37,7 +37,7 @@ Libaries can be placed as folders or ZIP files within your specified library dir
 
 1. Build your libraries - This tool only works with built Static (.lib) and Dynamic (.dll) Libraries
 2. If using for the first time, Set a location for your  libraies using the  `--libdir <directory>` flag. Example: `premake-gen --libdir "C:\premake-gen\libraries"`
-3. Create a new folder or ZIP file in your library directoy named after the library you are adding.
+3. Create a new folder or ZIP file in your library directory named after the library you are adding.
 3. Place required include headers into a "include" folder in your library folder/ZIP file.
 4. Place required static library files (.lib) into a "lib" folder in your library folder/ZIP file.
 5. Place required dynamic library files (.dll) into a "bin" folder in your library folder/ZIP file.
